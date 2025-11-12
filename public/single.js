@@ -16,9 +16,9 @@ const statusValue = document.getElementById('statusValue');
 const updatedAtValue = document.getElementById('updatedAtValue');
 
 const params = new URLSearchParams(window.location.search);
-const loginId = params.get('id');
+const loginSlug = params.get('ref');
 
-if (!loginId) {
+if (!loginSlug) {
   showToast('Login não informado.');
   throw new Error('Login ID ausente na URL.');
 }
@@ -50,7 +50,7 @@ function applyStats(on, off) {
 
 async function loadLogin() {
   try {
-    const response = await fetch(`/api/logins/${loginId}`);
+    const response = await fetch(`/api/logins/${loginSlug}`);
     if (!response.ok) {
       throw new Error('Não foi possível carregar o login.');
     }
@@ -81,7 +81,7 @@ function queueSave() {
 
   saveTimeout = setTimeout(async () => {
     try {
-      const response = await fetch(`/api/logins/${loginId}`, {
+      const response = await fetch(`/api/logins/${loginSlug}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ onTurf: onValue, offTurf: offValue }),

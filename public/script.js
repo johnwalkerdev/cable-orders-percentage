@@ -66,7 +66,7 @@ function updateTotals() {
 }
 
 function renderRow(data) {
-  const { id, login, onTurf, offTurf, updatedAt } = data;
+  const { slug, login, onTurf, offTurf, updatedAt } = data;
   const clone = rowTemplate.content.firstElementChild.cloneNode(true);
   const onInput = clone.querySelector('.on-input');
   const offInput = clone.querySelector('.off-input');
@@ -76,8 +76,8 @@ function renderRow(data) {
   const statusCell = clone.querySelector('.status-cell');
   const loginCell = clone.querySelector('.login-name');
 
-  clone.dataset.id = id;
-  loginCell.innerHTML = `<a class="login-link" href="login.html?id=${id}">${login}</a>`;
+  clone.dataset.slug = slug;
+  loginCell.innerHTML = `<a class="login-link" href="/login.html?ref=${slug}">${login}</a>`;
   if (updatedAt) {
     loginCell.title = `Atualizado em ${new Date(updatedAt).toLocaleString('pt-BR')}`;
   }
@@ -103,13 +103,13 @@ function renderRow(data) {
     const off = Number(offInput.value) || 0;
     const payload = { onTurf: on, offTurf: off };
 
-    if (saveTasks.has(id)) {
-      clearTimeout(saveTasks.get(id));
+    if (saveTasks.has(slug)) {
+      clearTimeout(saveTasks.get(slug));
     }
 
     const timeout = setTimeout(async () => {
       try {
-        const response = await fetch(`${API_URL}/${id}`, {
+        const response = await fetch(`${API_URL}/${slug}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -126,11 +126,11 @@ function renderRow(data) {
         console.error('Erro ao salvar dados', error);
         showToast('Erro ao salvar. Tente novamente.');
       } finally {
-        saveTasks.delete(id);
+        saveTasks.delete(slug);
       }
     }, 600);
 
-    saveTasks.set(id, timeout);
+    saveTasks.set(slug, timeout);
   };
 
   onInput.addEventListener('input', () => {
