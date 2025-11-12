@@ -89,6 +89,14 @@ app.get(`/${MAIN_DASHBOARD_SLUG}`, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+app.get('/login', (req, res) => {
+  res.redirect(`/${MAIN_DASHBOARD_SLUG}`);
+});
+
+app.get('/login/:slug', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

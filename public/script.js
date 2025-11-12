@@ -77,7 +77,7 @@ function renderRow(data) {
   const loginCell = clone.querySelector('.login-name');
 
   clone.dataset.slug = slug;
-  loginCell.innerHTML = `<a class="login-link" href="/login.html?ref=${slug}">${login}</a>`;
+  loginCell.innerHTML = `<a class="login-link" href="/login/${slug}">${login}</a>`;
   if (updatedAt) {
     loginCell.title = `Atualizado em ${new Date(updatedAt).toLocaleString('pt-BR')}`;
   }

@@ -15,12 +15,18 @@ const faltamValue = document.getElementById('faltamValue');
 const statusValue = document.getElementById('statusValue');
 const updatedAtValue = document.getElementById('updatedAtValue');
 
+const MAIN_DASHBOARD_PATH = '/90kKDLKJAlkafslhadsf';
 const params = new URLSearchParams(window.location.search);
-const loginSlug = params.get('ref');
+const pathParts = window.location.pathname.split('/').filter(Boolean);
+
+let loginSlug = params.get('ref');
+if (!loginSlug && pathParts[0] === 'login' && pathParts[1]) {
+  loginSlug = decodeURIComponent(pathParts[1]);
+}
 
 if (!loginSlug) {
-  showToast('Login não informado.');
-  throw new Error('Login ID ausente na URL.');
+  window.location.replace(MAIN_DASHBOARD_PATH);
+  throw new Error('Login slug ausente.');
 }
 
 function showToast(message, duration = 2500) {
