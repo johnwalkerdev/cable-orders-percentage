@@ -94,6 +94,7 @@ body.single {
 .top-bar {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   margin-bottom: 24px;
 }
@@ -101,16 +102,6 @@ body.single {
 .top-bar h1 {
   font-size: 1.4rem;
   margin: 0;
-}
-
-.back-link {
-  color: #007bff;
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.back-link:hover {
-  text-decoration: underline;
 }
 
 .card {
