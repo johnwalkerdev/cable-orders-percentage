@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Painel Individual - Turf Balance</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="single">
+  <header class="top-bar">
+    <a href="/" class="back-link">⟵ Voltar ao painel geral</a>
+    <h1 id="loginTitle">Painel Individual</h1>
+  </header>
+
+  <section class="card">
+    <div class="inputs">
+      <label>
+        ON Turf
+        <input type="number" min="0" step="1" id="onInput" value="0">
+      </label>
+      <label>
+        OFF Turf
+        <input type="number" min="0" step="1" id="offInput" value="0">
+      </label>
+    </div>
+
+    <div class="metrics">
+      <div>
+        <span class="metric-label">Total</span>
+        <span id="totalValue" class="metric-value">0</span>
+      </div>
+      <div>
+        <span class="metric-label">% OFF Turf</span>
+        <span id="percentValue" class="metric-value">0%</span>
+      </div>
+      <div>
+        <span class="metric-label">Faltam ON p/ meta</span>
+        <span id="faltamValue" class="metric-value">0</span>
+      </div>
+      <div>
+        <span class="metric-label">Status</span>
+        <span id="statusValue" class="metric-value status">-</span>
+      </div>
+      <div>
+        <span class="metric-label">Última atualização</span>
+        <span id="updatedAtValue" class="metric-value small">-</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="toast" id="toast">
+    <span id="toastMessage"></span>
+  </div>
+
+  <script src="single.js" type="module"></script>
+</body>
+</html>
+
