@@ -132,6 +132,48 @@ app.get('/login/:slug', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
+app.post('/api/import/plans', async (req, res) => {
+  try {
+    const { plans, source, connectionString, apiUrl, companyFilter } = req.body;
+    
+    const { importPlans, fetchPlansFromAPI, fetchPlansFromDB } = require('./src/importPlans');
+    
+    let plansToImport = plans;
+    
+    // Se não forneceu plans diretamente, busca da fonte
+    if (!plansToImport) {
+      if (source === 'api' && apiUrl) {
+        plansToImport = await fetchPlansFromAPI(apiUrl);
+      } else if (source === 'db' && connectionString) {
+        plansToImport = await fetchPlansFromDB(connectionString, companyFilter);
+      } else {
+        return res.status(400).json({ 
+          message: 'Forneça plans diretamente ou especifique source (api/db) com connectionString/apiUrl' 
+        });
+      }
+    }
+    
+    if (!Array.isArray(plansToImport) || plansToImport.length === 0) {
+      return res.status(400).json({ message: 'Nenhum plan fornecido ou formato inválido.' });
+    }
+    
+    const results = await importPlans(plansToImport);
+    
+    // Limpa cache
+    cache.allLogins = null;
+    cache.loginsBySlug.clear();
+    cache.cacheTime = 0;
+    
+    res.json({
+      message: `Importação concluída: ${results.filter(r => r.status === 'created').length} criados, ${results.filter(r => r.status === 'exists').length} já existiam`,
+      results,
+    });
+  } catch (error) {
+    console.error('Error importing plans', error);
+    res.status(500).json({ message: 'Erro ao importar plans.', error: error.message });
+  }
+});
+
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
