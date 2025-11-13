@@ -5,6 +5,8 @@ const toast = document.getElementById('toast');
 const toastMessage = document.getElementById('toastMessage');
 
 const saveTasks = new Map();
+let isLoading = false;
+let loadedSlugs = new Set();
 
 const statusConfig = [
   { max: 30, text: '✅ OK', className: 'green' },
@@ -67,6 +69,24 @@ function updateTotals() {
 
 function renderRow(data) {
   const { slug, login, onTurf, offTurf, updatedAt } = data;
+  
+  // Evita duplicatas
+  if (loadedSlugs.has(slug)) {
+    const existingRow = tableBody.querySelector(`tr[data-slug="${slug}"]`);
+    if (existingRow) {
+      // Atualiza valores se já existe
+      const onInput = existingRow.querySelector('.on-input');
+      const offInput = existingRow.querySelector('.off-input');
+      if (onInput && offInput) {
+        onInput.value = onTurf;
+        offInput.value = offTurf;
+        // Dispara evento para recalcular stats
+        onInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      return;
+    }
+  }
+  
   const clone = rowTemplate.content.firstElementChild.cloneNode(true);
   const onInput = clone.querySelector('.on-input');
   const offInput = clone.querySelector('.off-input');
@@ -77,6 +97,7 @@ function renderRow(data) {
   const loginCell = clone.querySelector('.login-name');
 
   clone.dataset.slug = slug;
+  loadedSlugs.add(slug);
   loginCell.innerHTML = `<a class="login-link" href="/login/${slug}">${login}</a>`;
   if (updatedAt) {
     loginCell.title = `Atualizado em ${new Date(updatedAt).toLocaleString('pt-BR')}`;
@@ -147,20 +168,43 @@ function renderRow(data) {
 }
 
 async function loadData() {
+  // Previne múltiplas requisições simultâneas
+  if (isLoading) {
+    return;
+  }
+  
+  isLoading = true;
+  
   try {
     const startTime = performance.now();
     const response = await fetch(API_URL, {
       cache: 'no-cache',
       headers: {
         'Accept': 'application/json',
+        'Cache-Control': 'no-cache',
       },
     });
     if (!response.ok) {
       throw new Error('Não foi possível carregar os dados.');
     }
     const data = await response.json();
+    
+    // Limpa apenas linhas que não estão mais nos dados
+    const currentSlugs = new Set(data.map(d => d.slug));
+    const rowsToRemove = [];
+    tableBody.querySelectorAll('tr[data-slug]').forEach(row => {
+      const slug = row.dataset.slug;
+      if (!currentSlugs.has(slug)) {
+        rowsToRemove.push(row);
+        loadedSlugs.delete(slug);
+      }
+    });
+    rowsToRemove.forEach(row => row.remove());
+    
+    // Renderiza/atualiza dados
     data.forEach(renderRow);
     updateTotals();
+    
     const loadTime = performance.now() - startTime;
     if (loadTime > 1000) {
       console.log(`Load time: ${loadTime.toFixed(2)}ms`);
@@ -168,6 +212,8 @@ async function loadData() {
   } catch (error) {
     console.error(error);
     showToast(error.message || 'Erro inesperado.');
+  } finally {
+    isLoading = false;
   }
 }
 

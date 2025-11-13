@@ -177,9 +177,10 @@ app.get('/api/plans/analyze', async (req, res) => {
 
 app.post('/api/import/plans', async (req, res) => {
   try {
-    const { plans, source, connectionString, apiUrl, companyFilter, syncFromDB } = req.body;
+    const { plans, source, connectionString, apiUrl, companyFilter, syncFromDB, supabaseUrl, organizationId } = req.body;
     
     const { importPlans, fetchPlansFromAPI, fetchPlansFromDB } = require('./src/importPlans');
+    const { fetchPlansFromSupabase, findB2SOrganizationId } = require('./src/fetchSupabasePlans');
     
     let plansToImport = plans;
     
@@ -208,13 +209,20 @@ app.post('/api/import/plans', async (req, res) => {
     }
     // Se não forneceu plans diretamente, busca da fonte
     else if (!plansToImport) {
-      if (source === 'api' && apiUrl) {
+      if (source === 'supabase' && supabaseUrl) {
+        // Busca plans do Supabase
+        let orgId = organizationId;
+        if (!orgId) {
+          orgId = await findB2SOrganizationId(supabaseUrl);
+        }
+        plansToImport = await fetchPlansFromSupabase(supabaseUrl, orgId);
+      } else if (source === 'api' && apiUrl) {
         plansToImport = await fetchPlansFromAPI(apiUrl);
       } else if (source === 'db' && connectionString) {
         plansToImport = await fetchPlansFromDB(connectionString, companyFilter);
       } else {
         return res.status(400).json({ 
-          message: 'Forneça plans diretamente, use syncFromDB=true, ou especifique source (api/db) com connectionString/apiUrl' 
+          message: 'Forneça plans diretamente, use syncFromDB=true, ou especifique source (supabase/api/db) com connectionString/apiUrl/supabaseUrl' 
         });
       }
     }

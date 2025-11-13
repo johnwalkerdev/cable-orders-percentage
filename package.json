@@ -7,6 +7,7 @@
     "start": "node server.js",
     "import-plans": "node scripts/import-plans.js",
     "import-b2s": "node scripts/import-b2s-plans.js",
+    "analyze-plans": "node scripts/analyze-supabase-plans.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

@@ -11,12 +11,14 @@ async function main() {
 Uso: node scripts/import-plans.js [opções]
 
 Opções:
-  --from-db <connectionString> [--company <nome>]  Importa de outro banco PostgreSQL
-  --from-api <url>                                  Importa de uma API
-  --from-file <caminho>                            Importa de arquivo JSON
-  --plans <json>                                   Importa plans diretamente (JSON string)
+  --from-supabase <connectionString> [--org-id <id>]  Importa do Supabase
+  --from-db <connectionString> [--company <nome>]     Importa de outro banco PostgreSQL
+  --from-api <url>                                     Importa de uma API
+  --from-file <caminho>                               Importa de arquivo JSON
+  --plans <json>                                      Importa plans diretamente (JSON string)
 
 Exemplos:
+  node scripts/import-plans.js --from-supabase "postgresql://..." --org-id "uuid"
   node scripts/import-plans.js --from-db "postgresql://..." --company "B2S ENTERPRISES LLC"
   node scripts/import-plans.js --from-api "https://api.example.com/plans"
   node scripts/import-plans.js --from-file "./plans.json"
@@ -28,7 +30,34 @@ Exemplos:
   let plansToImport = [];
   
   try {
-    if (args.includes('--from-db')) {
+    if (args.includes('--from-supabase')) {
+      const supabaseIndex = args.indexOf('--from-supabase');
+      const supabaseUrl = args[supabaseIndex + 1];
+      const orgIdIndex = args.indexOf('--org-id');
+      const orgId = orgIdIndex !== -1 ? args[orgIdIndex + 1] : null;
+      
+      if (!supabaseUrl) {
+        throw new Error('Connection string do Supabase é obrigatória para --from-supabase');
+      }
+      
+      const { fetchPlansFromSupabase, findB2SOrganizationId } = require('../src/fetchSupabasePlans');
+      
+      console.log('Buscando plans do Supabase...');
+      let organizationId = orgId;
+      if (!organizationId) {
+        console.log('Buscando ID da organização B2S ENTERPRISES LLC...');
+        organizationId = await findB2SOrganizationId(supabaseUrl);
+        if (organizationId) {
+          console.log(`Organização encontrada: ${organizationId}`);
+        } else {
+          console.log('⚠️  Organização B2S ENTERPRISES LLC não encontrada, buscando todos os plans...');
+        }
+      }
+      
+      plansToImport = await fetchPlansFromSupabase(supabaseUrl, organizationId);
+      console.log(`Encontrados ${plansToImport.length} plans`);
+      
+    } else if (args.includes('--from-db')) {
       const dbIndex = args.indexOf('--from-db');
       const connectionString = args[dbIndex + 1];
       const companyIndex = args.indexOf('--company');
