@@ -132,23 +132,89 @@ app.get('/login/:slug', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
+app.get('/api/plans/analyze', async (req, res) => {
+  try {
+    // Analisa plans do banco atual
+    const { rows: plansInDB } = await pool.query(`
+      SELECT 
+        id,
+        COALESCE(login, username, name) as login,
+        company,
+        COALESCE(on_turf, 0) as on_turf,
+        COALESCE(off_turf, 0) as off_turf,
+        created_at,
+        updated_at
+      FROM plans
+      WHERE company ILIKE '%B2S%ENTERPRISES%' 
+         OR company ILIKE '%B2S ENTERPRISES%'
+         OR company = 'B2S ENTERPRISES LLC'
+      ORDER BY login
+      LIMIT 1000
+    `);
+    
+    const companies = await pool.query(`
+      SELECT DISTINCT company, COUNT(*) as count
+      FROM plans
+      WHERE company IS NOT NULL
+      GROUP BY company
+      ORDER BY count DESC
+      LIMIT 20
+    `);
+    
+    res.json({
+      total: plansInDB.length,
+      plans: plansInDB,
+      companies: companies.rows,
+      message: plansInDB.length > 0 
+        ? `Encontrados ${plansInDB.length} plans de B2S ENTERPRISES LLC`
+        : 'Nenhum plan encontrado para B2S ENTERPRISES LLC na tabela plans',
+    });
+  } catch (error) {
+    console.error('Error analyzing plans', error);
+    res.status(500).json({ message: 'Erro ao analisar plans.', error: error.message });
+  }
+});
+
 app.post('/api/import/plans', async (req, res) => {
   try {
-    const { plans, source, connectionString, apiUrl, companyFilter } = req.body;
+    const { plans, source, connectionString, apiUrl, companyFilter, syncFromDB } = req.body;
     
     const { importPlans, fetchPlansFromAPI, fetchPlansFromDB } = require('./src/importPlans');
     
     let plansToImport = plans;
     
+    // Se syncFromDB = true, busca do banco atual
+    if (syncFromDB && !plansToImport) {
+      const { rows } = await pool.query(`
+        SELECT 
+          COALESCE(login, username, name) as login,
+          company,
+          COALESCE(on_turf, 0) as on_turf,
+          COALESCE(off_turf, 0) as off_turf
+        FROM plans
+        WHERE company ILIKE '%B2S%ENTERPRISES%' 
+           OR company ILIKE '%B2S ENTERPRISES%'
+           OR company = 'B2S ENTERPRISES LLC'
+           ${companyFilter ? `OR company = $1` : ''}
+        ORDER BY login
+      `, companyFilter ? [companyFilter] : []);
+      
+      plansToImport = rows.map(p => ({
+        login: p.login,
+        onTurf: parseInt(p.on_turf) || 0,
+        offTurf: parseInt(p.off_turf) || 0,
+        company: p.company,
+      }));
+    }
     // Se não forneceu plans diretamente, busca da fonte
-    if (!plansToImport) {
+    else if (!plansToImport) {
       if (source === 'api' && apiUrl) {
         plansToImport = await fetchPlansFromAPI(apiUrl);
       } else if (source === 'db' && connectionString) {
         plansToImport = await fetchPlansFromDB(connectionString, companyFilter);
       } else {
         return res.status(400).json({ 
-          message: 'Forneça plans diretamente ou especifique source (api/db) com connectionString/apiUrl' 
+          message: 'Forneça plans diretamente, use syncFromDB=true, ou especifique source (api/db) com connectionString/apiUrl' 
         });
       }
     }
@@ -167,6 +233,9 @@ app.post('/api/import/plans', async (req, res) => {
     res.json({
       message: `Importação concluída: ${results.filter(r => r.status === 'created').length} criados, ${results.filter(r => r.status === 'exists').length} já existiam`,
       results,
+      total: plansToImport.length,
+      created: results.filter(r => r.status === 'created').length,
+      exists: results.filter(r => r.status === 'exists').length,
     });
   } catch (error) {
     console.error('Error importing plans', error);
