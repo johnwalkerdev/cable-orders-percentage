@@ -11,6 +11,13 @@ const pool = new Pool({
   ssl: {
     rejectUnauthorized: false,
   },
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+});
+
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle client', err);
 });
 
 module.exports = pool;

@@ -148,18 +148,32 @@ function renderRow(data) {
 
 async function loadData() {
   try {
-    const response = await fetch(API_URL);
+    const startTime = performance.now();
+    const response = await fetch(API_URL, {
+      cache: 'no-cache',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
     if (!response.ok) {
       throw new Error('Não foi possível carregar os dados.');
     }
     const data = await response.json();
     data.forEach(renderRow);
     updateTotals();
+    const loadTime = performance.now() - startTime;
+    if (loadTime > 1000) {
+      console.log(`Load time: ${loadTime.toFixed(2)}ms`);
+    }
   } catch (error) {
     console.error(error);
     showToast(error.message || 'Erro inesperado.');
   }
 }
 
-loadData();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', loadData);
+} else {
+  loadData();
+}
 

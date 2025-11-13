@@ -56,7 +56,13 @@ function applyStats(on, off) {
 
 async function loadLogin() {
   try {
-    const response = await fetch(`/api/logins/${loginSlug}`);
+    const startTime = performance.now();
+    const response = await fetch(`/api/logins/${loginSlug}`, {
+      cache: 'no-cache',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
     if (!response.ok) {
       throw new Error('Não foi possível carregar o login.');
     }
@@ -67,6 +73,10 @@ async function loadLogin() {
     applyStats(data.onTurf, data.offTurf);
     if (data.updatedAt) {
       updatedAtValue.textContent = new Date(data.updatedAt).toLocaleString('pt-BR');
+    }
+    const loadTime = performance.now() - startTime;
+    if (loadTime > 1000) {
+      console.log(`Load time: ${loadTime.toFixed(2)}ms`);
     }
   } catch (error) {
     console.error(error);
