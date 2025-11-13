@@ -30,19 +30,33 @@ app.use(
 );
 
 app.get('/api/logins', async (req, res) => {
-  const now = Date.now();
-  if (cache.allLogins && now - cache.cacheTime < cache.TTL) {
-    res.set('X-Cache', 'HIT');
-    return res.json(cache.allLogins);
-  }
-
+  const userEmail = req.headers['x-user-email'] || req.query.userEmail;
+  const organizationId = req.query.organizationId;
+  
   try {
-    const { rows } = await pool.query(
-      'SELECT id, login, slug, on_turf AS "onTurf", off_turf AS "offTurf", updated_at AS "updatedAt" FROM logins ORDER BY login'
-    );
-    cache.allLogins = rows;
-    cache.cacheTime = now;
-    res.set('X-Cache', 'MISS');
+    let rows;
+    
+    // Se tiver userEmail, filtra por permissões
+    if (userEmail) {
+      const { getAccessibleLogins } = require('./src/permissions');
+      rows = await getAccessibleLogins(userEmail, organizationId);
+    } else {
+      // Sem autenticação, retorna todos (comportamento antigo para compatibilidade)
+      const now = Date.now();
+      if (cache.allLogins && now - cache.cacheTime < cache.TTL) {
+        res.set('X-Cache', 'HIT');
+        return res.json(cache.allLogins);
+      }
+      
+      const { rows: allRows } = await pool.query(
+        'SELECT id, login, slug, on_turf AS "onTurf", off_turf AS "offTurf", updated_at AS "updatedAt", organization_id AS "organizationId" FROM logins ORDER BY login'
+      );
+      rows = allRows;
+      cache.allLogins = rows;
+      cache.cacheTime = now;
+      res.set('X-Cache', 'MISS');
+    }
+    
     res.json(rows);
   } catch (error) {
     console.error('Error fetching logins', error);
@@ -82,6 +96,7 @@ app.get('/api/logins/:slug', async (req, res) => {
 app.patch('/api/logins/:slug', async (req, res) => {
   const { slug } = req.params;
   const { onTurf, offTurf } = req.body;
+  const userEmail = req.headers['x-user-email'] || req.body.userEmail;
 
   if (
     typeof onTurf !== 'number' ||
@@ -93,11 +108,34 @@ app.patch('/api/logins/:slug', async (req, res) => {
   }
 
   try {
+    // Busca o login primeiro para verificar permissões
+    const { rows: loginRows } = await pool.query(
+      'SELECT id, login, organization_id FROM logins WHERE slug = $1',
+      [slug]
+    );
+
+    if (loginRows.length === 0) {
+      return res.status(404).json({ message: 'Login não encontrado.' });
+    }
+
+    const login = loginRows[0];
+
+    // Se tiver userEmail, verifica permissões
+    if (userEmail && login.organization_id) {
+      const { canViewOrganization, hasRole } = require('./src/permissions');
+      const canView = await canViewOrganization(userEmail, login.organization_id);
+      const canEdit = await hasRole(userEmail, login.organization_id, 'vendor');
+      
+      if (!canView || !canEdit) {
+        return res.status(403).json({ message: 'Sem permissão para editar este login.' });
+      }
+    }
+
     const { rowCount, rows } = await pool.query(
       `UPDATE logins 
        SET on_turf = $1, off_turf = $2, updated_at = NOW() 
        WHERE slug = $3 
-       RETURNING id, login, slug, on_turf AS "onTurf", off_turf AS "offTurf", updated_at AS "updatedAt"`,
+       RETURNING id, login, slug, on_turf AS "onTurf", off_turf AS "offTurf", updated_at AS "updatedAt", organization_id AS "organizationId"`,
       [onTurf, offTurf, slug]
     );
 
@@ -130,6 +168,57 @@ app.get('/login', (req, res) => {
 
 app.get('/login/:slug', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// Endpoints de permissões e organizações
+app.get('/api/user/organizations', async (req, res) => {
+  const userEmail = req.headers['x-user-email'] || req.query.userEmail;
+  
+  if (!userEmail) {
+    return res.status(400).json({ message: 'userEmail é obrigatório.' });
+  }
+  
+  try {
+    const { getUserOrganizations } = require('./src/permissions');
+    const orgs = await getUserOrganizations(userEmail);
+    res.json(orgs);
+  } catch (error) {
+    console.error('Error fetching user organizations', error);
+    res.status(500).json({ message: 'Erro ao buscar organizações.' });
+  }
+});
+
+app.get('/api/organizations', async (req, res) => {
+  const userEmail = req.headers['x-user-email'] || req.query.userEmail;
+  
+  try {
+    let query = 'SELECT id, name, company_name, created_at, updated_at FROM organizations ORDER BY name';
+    let params = [];
+    
+    // Se tiver userEmail, filtra apenas organizações que o usuário tem acesso
+    if (userEmail) {
+      const { getUserOrganizationIds } = require('./src/permissions');
+      const orgIds = await getUserOrganizationIds(userEmail);
+      
+      if (orgIds.length === 0) {
+        return res.json([]);
+      }
+      
+      query = `
+        SELECT id, name, company_name, created_at, updated_at 
+        FROM organizations 
+        WHERE id = ANY($1)
+        ORDER BY name
+      `;
+      params = [orgIds];
+    }
+    
+    const { rows } = await pool.query(query, params);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching organizations', error);
+    res.status(500).json({ message: 'Erro ao buscar organizações.' });
+  }
 });
 
 app.get('/api/plans/analyze', async (req, res) => {
